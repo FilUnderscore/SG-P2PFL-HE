@@ -91,8 +91,9 @@ class P2PPeer(FLPeer):
         peer_models = []
         
         for peer in self.get_peer_list():
-            self.fetch('http://' + peer['address'] + ':' + peer['ext_port'] + '/latest_model', f'temp/peer_{peer_id}_{peer['peer_index']}_model.pth')
-            peer_models.append(f'temp/peer_{peer_id}_{peer['peer_index']}_model.pth')
+            peer_index = peer['peer_index']
+            self.fetch('http://' + peer['address'] + ':' + peer['ext_port'] + '/latest_model', f'temp/peer_{peer_id}_{peer_index}_model.pth')
+            peer_models.append(f'temp/peer_{peer_id}_{peer_index}_model.pth')
 
         print(peer_models)
         FLPeer.aggregate(self, peer_models)
