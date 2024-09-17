@@ -4,24 +4,45 @@ from csv_ts_data_provider import CSVTSDataProvider
 import torch
 
 from threading import Thread
-from flask import Flask, send_file
+from flask import Flask, send_file, request
 
 from requests import post, get
 from shutil import copyfileobj
 
 from time import sleep
 
+import nacl.utils
+from nacl.public import PrivateKey, PublicKey, Box
+from nacl.encoding import HexEncoder
+
+from io import BytesIO
+
 app = Flask(__name__)
 trained = False
 peer_id = 0
+peer_inst = None
 
 # Download model from another peer
 @app.route('/latest_model', methods=['GET'])
 def download_model():
+    print('Key {}', request.args.get('key', type=str))
+    requester_public_key = PublicKey(bytes.fromhex(request.args.get('key', type=str)), HexEncoder)
+
     try:
-        return send_file(f'temp/{peer_id}_model.pth')
+        buffer = BytesIO()
+        
+        with open(f'temp/{peer_id}_model.pth', 'rb') as f:
+            buffer.write(peer_inst.encrypt(requester_public_key, f.read()))
+        
+        buffer.seek(0)
+
+        return send_file(buffer, download_name=f'{peer_id}_model.pth', mimetype='application/octet-stream')
     except FileNotFoundError:
         return 'File not found', 404
+
+@app.route('/key', methods=['GET'])
+def get_key():
+    return peer_inst.public_key.encode(HexEncoder).hex()
 
 # Send a newly trained model to a peer to trigger aggregation
 @app.route('/ready', methods=['GET'])
@@ -36,6 +57,13 @@ class P2PPeer(FLPeer):
         FLPeer.__init__(self, ml_model, data_provider)
         self.LOCAL_PORT = LOCAL_PORT
         self.REGISTRATION_ADDRESS = REGISTRATION_ADDRESS
+        self.secret_key = PrivateKey.generate()
+        self.public_key = self.secret_key.public_key
+
+        print(self.public_key.encode(HexEncoder).hex())
+
+        global peer_inst
+        peer_inst = self
 
     def start(self):
         print('Registering self with registration node.')
@@ -57,6 +85,14 @@ class P2PPeer(FLPeer):
 
     def get_peer_list(self):
         return get(self.REGISTRATION_ADDRESS + '/peers').json()['peers']
+
+    def encrypt(self, target_public_key, plaintext: bytes):
+        box = Box(self.secret_key, target_public_key)
+        return box.encrypt(plaintext)
+    
+    def decrypt(self, target_public_key, ciphertext: bytes):
+        box = Box(self.secret_key, target_public_key)
+        return box.decrypt(ciphertext)
 
     def fetch(self, url, target_filename):
         with get(url, stream=True) as request:
@@ -88,11 +124,17 @@ class P2PPeer(FLPeer):
                 break
 
     def aggregate(self):
+        self_public_key_string = self.public_key.encode(HexEncoder).hex()
         peer_models = []
         
         for peer in self.get_peer_list():
             peer_index = peer['peer_index']
-            self.fetch('http://' + peer['address'] + ':' + peer['ext_port'] + '/latest_model', f'temp/peer_{peer_id}_{peer_index}_model.pth')
+            peer_public_key = PublicKey(bytes.fromhex(get(f'http://' + peer['address'] + ':' + peer['ext_port'] + '/key').text), HexEncoder)
+            self.fetch('http://' + peer['address'] + ':' + peer['ext_port'] + '/latest_model?key=' + self_public_key_string, f'temp/peer_{peer_id}_{peer_index}_model_enc.pth')
+
+            with open(f'temp/peer_{peer_id}_{peer_index}_model_enc.pth', 'rb') as in_f, open(f'temp/peer_{peer_id}_{peer_index}_model.pth', 'wb') as out_f:
+                out_f.write(self.decrypt(peer_public_key, in_f.read()))
+
             peer_models.append(f'temp/peer_{peer_id}_{peer_index}_model.pth')
 
         print(peer_models)
