@@ -19,18 +19,17 @@ class LossRecorder(Callback):
 loss_recorder = LossRecorder()
 early_stopper = EarlyStopping(monitor="val_loss", patience=30, min_delta=0.05, mode='min')
 
-def generate_torch_kwargs(callbacks):
-    callbacks.append([TFMProgressBar(enable_train_bar_only=False), loss_recorder, early_stopper])
-
+def generate_torch_kwargs():
     return {
         "pl_trainer_kwargs": {
             "accelerator": "gpu",
             "devices": [0],
-            "callbacks": callbacks
+            "callbacks": [TFMProgressBar(enable_train_bar_only=False), loss_recorder]
         }
     }
 
-model = RNNModel(model = 'LSTM', hidden_dim=20, n_rnn_layers=1, dropout=0, batch_size=16, n_epochs=300, optimizer_kwargs={"lr": 1e-3}, random_state=42, training_length=20, input_chunk_length=14, loss_fn=L1Loss(), force_reset=True, **generate_torch_kwargs([]))
+# Best hyperparameters found were:  {'batch_size': 16, 'n_rnn_layers': 2, 'dropout': 0.14587531358360983, 'training_length': 32, 'input_chunk_length': 32, 'hidden_dim': 18, 'loss_fn': MSELoss()}
+model = RNNModel(model = 'LSTM', hidden_dim=18, n_rnn_layers=2, dropout=0.14587, batch_size=16, n_epochs=1000, optimizer_kwargs={"lr": 1e-3}, random_state=42, training_length=32, input_chunk_length=32, loss_fn=MSELoss(), force_reset=True, **generate_torch_kwargs())
 
 def train_model(model_args, callbacks):
     callbacks.append(early_stopper)
