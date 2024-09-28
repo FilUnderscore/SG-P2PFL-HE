@@ -1,10 +1,11 @@
-from torch.nn import L1Loss
+from torch.nn import L1Loss, MSELoss
 from darts.models import RNNModel
 from darts.utils.callbacks import TFMProgressBar
 
-from darts import TimeSeries
-from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.callbacks import Callback, EarlyStopping
 import matplotlib.pyplot as plt
+
+from torchmetrics import MetricCollection, MeanAbsolutePercentageError, MeanAbsoluteError
 
 class LossRecorder(Callback):
     def __init__(self):
@@ -16,13 +17,22 @@ class LossRecorder(Callback):
         self.val_loss_history.append(trainer.callback_metrics["val_loss"].item())
 
 loss_recorder = LossRecorder()
+early_stopper = EarlyStopping(monitor="val_loss", patience=30, min_delta=0.05, mode='min')
 
-def generate_torch_kwargs():
+def generate_torch_kwargs(callbacks):
+    callbacks.append([TFMProgressBar(enable_train_bar_only=False), loss_recorder, early_stopper])
+
     return {
         "pl_trainer_kwargs": {
-            "accelerator": "cpu",
-            "callbacks": [TFMProgressBar(enable_train_bar_only=False), loss_recorder]
+            "accelerator": "gpu",
+            "devices": [0],
+            "callbacks": callbacks
         }
     }
 
-model = RNNModel(model = 'LSTM', hidden_dim=64, n_rnn_layers=2, dropout=0.14, batch_size=64, n_epochs=50, optimizer_kwargs={"lr": 0.01}, random_state=42, training_length=128, input_chunk_length=64, loss_fn=L1Loss(), force_reset=True, **generate_torch_kwargs())
+model = RNNModel(model = 'LSTM', hidden_dim=20, n_rnn_layers=1, dropout=0, batch_size=16, n_epochs=300, optimizer_kwargs={"lr": 1e-3}, random_state=42, training_length=20, input_chunk_length=14, loss_fn=L1Loss(), force_reset=True, **generate_torch_kwargs([]))
+
+def train_model(model_args, callbacks):
+    callbacks.append(early_stopper)
+    torch_metrics = MetricCollection([MeanAbsoluteError()])
+    return RNNModel(model = 'LSTM', n_epochs=300, optimizer_kwargs={"lr": 1e-3}, random_state=42, force_reset=True, torch_metrics=torch_metrics, pl_trainer_kwargs={"callbacks":callbacks, "enable_progress_bar": False}, **model_args)
