@@ -1,18 +1,19 @@
 from fl_peer import FLPeer
 from MLTSModel import MLTSModel
-from csv_ts_data_provider import CSVTSDataProvider
+from data_provider import CSVTSDataProvider
 
 import datetime
 
 import matplotlib.pyplot as plt
 
-from fl_sample_model import model, loss_recorder, train_model
+from fl_sample_model import loss_recorder, train_model, recreate_early_stopper
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
 from ray.tune.schedulers import ASHAScheduler
 
 from torch.nn import L1Loss, MSELoss
+import random
 
 def strToDateTime(str):
     return datetime.datetime.strptime(str, '%d/%m/%Y %H:%M')
@@ -25,21 +26,25 @@ def train_model1(model_args, callbacks, csv_ts_data_provider):
     ml_model = MLTSModel(train_model(model_args, callbacks))
     peer = FLPeer(ml_model, csv_ts_data_provider)
     peer.train()
+    loss_recorder.train_loss_history.clear()
+    loss_recorder.val_loss_history.clear()
+    recreate_early_stopper()
 
-csv_ts_data_provider = CSVTSDataProvider('C:\\Users\\Filip\\Desktop\\P2PFL\\testdata.csv', lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
+csv_ts_data_provider = CSVTSDataProvider('C:\\Users\\Filip\\Desktop\\P2PFL\\testdata2.csv', lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
 
 tune_callback = TuneReportCheckpointCallback(
     {
-        "loss": "val_loss",
+        "loss": "val_loss"
     },
-    on="validation_end"
+    on="validation_end",
+    save_checkpoints=False
 )
 
 config = {
     "batch_size": tune.choice([16, 32, 64, 128, 256]),
     "n_rnn_layers": tune.choice([1, 2, 3]),
     "dropout": tune.uniform(0, 0.5),
-    "training_length": tune.choice([32, 64, 128, 256]),
+    "training_length": tune.sample_from(lambda spec: random.randint(spec.config.input_chunk_length, spec.config.input_chunk_length * 2)),
     "input_chunk_length": tune.choice([16, 32, 64, 128]),
     "hidden_dim": tune.randint(1, 256),
     "loss_fn": tune.choice([L1Loss(), MSELoss()])

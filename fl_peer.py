@@ -1,10 +1,10 @@
 from MLTSModel import MLTSModel
-from csv_ts_data_provider import CSVTSDataProvider
+from data_provider import DataProvider
 import torch
 from copy import deepcopy
 
 class FLPeer:
-    def __init__(self, ml_model: MLTSModel, data_provider: CSVTSDataProvider):
+    def __init__(self, ml_model: MLTSModel, data_provider: DataProvider):
         self.ml_model = ml_model
         self.data_provider = data_provider
 

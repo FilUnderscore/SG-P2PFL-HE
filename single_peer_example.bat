@@ -1,1 +1,1 @@
-python single_peer.py
+python local_peers_example.py testdata.csv

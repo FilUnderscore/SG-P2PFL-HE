@@ -10,7 +10,7 @@ class MLTSModel:
         self.model = model
 
     def train(self, series: TimeSeries):
-        train_set, val_set = series.split_after(0.75)
+        train_set, val_set = series.split_after(0.8)
         transformer = Scaler()
 
         print('Train Set:')

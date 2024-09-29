@@ -1,1 +1,1 @@
-python two_peers.py
+python local_peers_example.py testdata.csv testdata1.csv
