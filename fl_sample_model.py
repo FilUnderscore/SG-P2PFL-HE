@@ -25,4 +25,4 @@ def generate_torch_kwargs():
         }
     }
 
-model = RNNModel(model = 'LSTM', hidden_dim=20, n_rnn_layers=1, dropout=0, batch_size=16, n_epochs=100, optimizer_kwargs={"lr": 0.01}, random_state=42, training_length=16, input_chunk_length=10, loss_fn=L1Loss(), force_reset=True, **generate_torch_kwargs())
+model = RNNModel(model = 'LSTM', hidden_dim=64, n_rnn_layers=2, dropout=0.14, batch_size=64, n_epochs=50, optimizer_kwargs={"lr": 0.01}, random_state=42, training_length=128, input_chunk_length=64, loss_fn=L1Loss(), force_reset=True, **generate_torch_kwargs())

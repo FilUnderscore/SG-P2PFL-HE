@@ -13,6 +13,9 @@ class MLTSModel:
         train_set, val_set = series.split_after(0.75)
         transformer = Scaler()
 
+        print('Train Set:')
+        print(train_set)
+
         train_transformed = transformer.fit_transform(train_set)
         val_transformed = transformer.transform(val_set)
 

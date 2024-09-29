@@ -9,15 +9,15 @@ import matplotlib.pyplot as plt
 from fl_sample_model import model, loss_recorder
 
 def strToDateTime(str):
-    return datetime.datetime.strptime(str, '%d/%m/%Y')
+    return datetime.datetime.strptime(str, '%d/%m/%Y %H:%M')
 
 def apply_datetime_transformations(df):
-    df["day"] = df["day"].apply(lambda x: strToDateTime(x))
+    df["tstp"] = df["tstp"].apply(lambda x: strToDateTime(x))
     return df
 
 # Program Code
 ml_model = MLTSModel(model)
-csv_ts_data_provider = CSVTSDataProvider('testdata.csv', lambda df: apply_datetime_transformations(df), time_col='day', value_cols=['energy_median'])
+csv_ts_data_provider = CSVTSDataProvider('testdata.csv', lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
 
 print('Starting Peer')
 peer = FLPeer(ml_model, csv_ts_data_provider)

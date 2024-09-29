@@ -12,7 +12,14 @@ class CSVTSDataProvider(DataProvider):
     def get_data(self):
         df = pd.read_csv(self.csv_file, delimiter=',')
         df = self.transform(df)
+        df['tstp'] = pd.to_datetime(df['tstp'])
+        df = df.set_index('tstp')
+        print('AFTER INDEX:')
+        print(df)
+        df = df.asfreq(freq='h', fill_value=0.0)
+        print('AFTER FREQ:')
+        print(df)
 
-        series = TimeSeries.from_dataframe(df, time_col=self.time_col, value_cols=self.value_cols)
+        series = TimeSeries.from_dataframe(df, value_cols=self.value_cols)
 
         return series
