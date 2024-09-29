@@ -5,6 +5,7 @@ from csv_ts_data_provider import CSVTSDataProvider
 import datetime
 
 import matplotlib.pyplot as plt
+from darts.dataprocessing.transformers.scaler import Scaler
 
 from fl_sample_model import model, loss_recorder
 
@@ -23,11 +24,16 @@ print('Starting Peer')
 peer = FLPeer(ml_model, csv_ts_data_provider)
 peer.train()
 
-prediction = peer.ml_model.predict(365)
+prediction = peer.ml_model.predict(365 * 20)
 
 plt.figure(0)
-csv_ts_data_provider.get_data().plot()
-prediction.plot(label="forecast", low_quantile=0.05, high_quantile=0.95)
+
+series = csv_ts_data_provider.get_data()
+transformer = Scaler()
+series_transformed = transformer.fit_transform(series)
+series_transformed.plot(label='transformed actual')
+
+prediction.plot(label="forecast")
 plt.legend()
 plt.title(f'Training Results')
 
