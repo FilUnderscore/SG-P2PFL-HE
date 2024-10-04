@@ -1,7 +1,6 @@
 from fl_peer import FLPeer
 from MLTSModel import MLTSModel
-from csv_ts_data_provider import CSVTSDataProvider
-import torch
+from data_provider import CSVTSDataProvider
 
 from threading import Thread
 from flask import Flask, send_file, request
@@ -11,38 +10,42 @@ from shutil import copyfileobj
 
 from time import sleep
 
-import nacl.utils
-from nacl.public import PrivateKey, PublicKey, Box
-from nacl.encoding import HexEncoder
-
+import tenseal as ts
 from io import BytesIO
+
+from encrypted_model import EncryptedModel
+from binary import BinaryDecoder, BinaryEncoder
+from threading import Condition
+from torch import div
+from copy import deepcopy
 
 app = Flask(__name__)
 trained = False
 peer_id = 0
 peer_inst = None
 
-# Download model from another peer
-@app.route('/latest_model', methods=['GET'])
-def download_model():
-    print('Key {}', request.args.get('key', type=str))
-    requester_public_key = PublicKey(bytes.fromhex(request.args.get('key', type=str)), HexEncoder)
+# Aggregate model from another peer
+@app.route('/aggregate_model', methods=['POST'])
+def aggregate_model():
+    print('Hello aggregate!')
 
-    try:
-        buffer = BytesIO()
-        
-        with open(f'temp/{peer_id}_model.pth', 'rb') as f:
-            buffer.write(peer_inst.encrypt(requester_public_key, f.read()))
-        
-        buffer.seek(0)
+    buffer = BytesIO(request.data)
+    decoder = BinaryDecoder(buffer)
 
-        return send_file(buffer, download_name=f'{peer_id}_model.pth', mimetype='application/octet-stream')
-    except FileNotFoundError:
-        return 'File not found', 404
+    print('Received aggregate request.')
 
-@app.route('/key', methods=['GET'])
-def get_key():
-    return peer_inst.public_key.encode(HexEncoder).hex()
+    model_owner = decoder.decode_int()
+    aggregated_count = decoder.decode_int()
+    encrypted_model = EncryptedModel.from_buffer(buffer, peer_inst.context)
+
+    print('Model owner: ' + str(model_owner) + ' - OUR ID: ' + str(peer_id) + ' - AGGREGATE COUNT ' + str(aggregated_count))
+
+    if peer_id != model_owner:
+        peer_inst.aggregate_received_model(encrypted_model, model_owner, aggregated_count)
+    else:
+        peer_inst.decode_received_model(encrypted_model, aggregated_count)
+    
+    return "OK", 200
 
 # Send a newly trained model to a peer to trigger aggregation
 @app.route('/ready', methods=['GET'])
@@ -57,10 +60,10 @@ class P2PPeer(FLPeer):
         FLPeer.__init__(self, ml_model, data_provider)
         self.LOCAL_PORT = LOCAL_PORT
         self.REGISTRATION_ADDRESS = REGISTRATION_ADDRESS
-        self.secret_key = PrivateKey.generate()
-        self.public_key = self.secret_key.public_key
-
-        print(self.public_key.encode(HexEncoder).hex())
+        self.context = ts.context(ts.SCHEME_TYPE.CKKS, poly_modulus_degree=8192, coeff_mod_bit_sizes=[60, 40, 40, 60])
+        self.context.generate_galois_keys()
+        self.context.global_scale = 2**40
+        self.aggregate_cond = Condition()
 
         global peer_inst
         peer_inst = self
@@ -86,18 +89,14 @@ class P2PPeer(FLPeer):
     def get_peer_list(self):
         return get(self.REGISTRATION_ADDRESS + '/peers').json()['peers']
 
-    def encrypt(self, target_public_key, plaintext: bytes):
-        box = Box(self.secret_key, target_public_key)
-        return box.encrypt(plaintext)
-    
-    def decrypt(self, target_public_key, ciphertext: bytes):
-        box = Box(self.secret_key, target_public_key)
-        return box.decrypt(ciphertext)
-
     def fetch(self, url, target_filename):
         with get(url, stream=True) as request:
             with open(target_filename, 'wb') as file:
                 copyfileobj(request.raw, file)
+
+    def send(self, url, buffer):
+        print('Posting to ' + url)
+        post(url, data=buffer)
 
     def train(self):
         FLPeer.train(self)
@@ -122,20 +121,77 @@ class P2PPeer(FLPeer):
 
             if other_peers_ready:
                 break
+    
+    def get_next_peer_id(self):
+        peer_count = len(self.get_peer_list())
+        return (peer_id + 1) % peer_count
+
+    def aggregate_received_model(self, encrypted_model: EncryptedModel, model_owner: int, aggregated_count: int):
+        state_dict = self.ml_model.model.model.state_dict()
+
+        for k in encrypted_model.encrypted_tensors:
+            encrypted_model.encrypted_tensors[k].add(state_dict[k])
+        
+        # send to next peer
+        next_peer = self.get_peer_list()[self.get_next_peer_id()]
+
+        encrypted_model_buffer = BytesIO()
+        encoder = BinaryEncoder(encrypted_model_buffer)
+
+        encoder.encode_int(model_owner)
+        encoder.encode_int(aggregated_count + 1)
+        
+        self.send('http://' + next_peer['address'] + ':' + next_peer['ext_port'] + '/aggregate_model', encrypted_model.to_buffer(encrypted_model_buffer))
+
+    def decode_received_model(self, encrypted_model: EncryptedModel, aggregated_count: int):
+        print('Acquiring.')
+        self.aggregate_cond.acquire()
+        print('Acquired.')
+        state_dict = deepcopy(self.ml_model.model.model.state_dict())
+
+        for k in encrypted_model.encrypted_tensors:
+            encrypted_tensor = encrypted_model.encrypted_tensors[k]
+            print('received tensor')
+            print(encrypted_tensor.decrypt())
+            print('stored tensor')
+            print(state_dict[k])
+            state_dict[k] = div(encrypted_tensor.decrypt(), aggregated_count + 1)
+            print('result tensor')
+            print(state_dict[k])
+        
+        self.ml_model.load_state_dict(state_dict)
+        
+        print('Loaded state dict.')
+
+        self.aggregate_cond.notify()
+        self.aggregate_cond.release()
+
+        print('Notified.')
 
     def aggregate(self):
-        self_public_key_string = self.public_key.encode(HexEncoder).hex()
-        peer_models = []
-        
-        for peer in self.get_peer_list():
-            peer_index = peer['peer_index']
-            peer_public_key = PublicKey(bytes.fromhex(get(f'http://' + peer['address'] + ':' + peer['ext_port'] + '/key').text), HexEncoder)
-            self.fetch('http://' + peer['address'] + ':' + peer['ext_port'] + '/latest_model?key=' + self_public_key_string, f'temp/peer_{peer_id}_{peer_index}_model_enc.pth')
+        # send encrypted model to next peer and next peer will send to following peer etc.
+        encrypted_model = self.ml_model.encrypt(self.context)
 
-            with open(f'temp/peer_{peer_id}_{peer_index}_model_enc.pth', 'rb') as in_f, open(f'temp/peer_{peer_id}_{peer_index}_model.pth', 'wb') as out_f:
-                out_f.write(self.decrypt(peer_public_key, in_f.read()))
+        next_peer = self.get_peer_list()[self.get_next_peer_id()]
+        model_owner = peer_id
 
-            peer_models.append(f'temp/peer_{peer_id}_{peer_index}_model.pth')
+        print('Beginning encoding.')
 
-        print(peer_models)
-        FLPeer.aggregate(self, peer_models)
+        encrypted_model_buffer = BytesIO()
+        encoder = BinaryEncoder(encrypted_model_buffer)
+
+        encoder.encode_int(model_owner)
+        encoder.encode_int(0)
+
+        print('Posting.')
+
+        self.send('http://' + next_peer['address'] + ':' + next_peer['ext_port'] + '/aggregate_model', encrypted_model.to_buffer(encrypted_model_buffer))
+
+        print('Waiting for models to be aggregated...')
+
+        # wait for model to be received and decrypt.
+        #self.aggregate_cond.acquire()
+        #self.aggregate_cond.wait()
+        #self.aggregate_cond.release()
+
+        print('Aggregated models.')

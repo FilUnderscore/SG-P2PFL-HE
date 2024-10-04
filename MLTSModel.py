@@ -4,6 +4,9 @@ import torch
 from darts.utils.timeseries_generation import datetime_attribute_timeseries
 import pandas as pd
 from darts.dataprocessing.transformers.scaler import Scaler
+from encrypted_model import EncryptedModel
+from copy import deepcopy
+from encrypted_tensor import EncryptedTensor
 
 class MLTSModel:
     def __init__(self, model: TorchForecastingModel):
@@ -38,3 +41,25 @@ class MLTSModel:
     
     def save(self, path):
         torch.save(self.model.model.state_dict(), path)
+    
+    def encrypt(self, context):
+        model_copy = deepcopy(self.model.model.state_dict())
+        encrypted_tensors = {}
+
+        print('Enc')
+
+        for k in model_copy.keys():
+            print('Key: ' + str(k))
+            tensor: torch.Tensor = model_copy[k]
+            print('Tensor: ')
+            print(tensor)
+            print('Shape: ' + str(tensor.shape))
+            print('Size: ' + str(tensor.size()))
+            encrypted_tensor = EncryptedTensor.encrypt(context, tensor)
+            print('Encrypted?')
+            encrypted_tensors[k] = encrypted_tensor
+            print('Encrypted tensor of key ' + str(k))
+            print('Decrypt tensor -')
+            print(encrypted_tensor.decrypt())
+        
+        return EncryptedModel(encrypted_tensors)
