@@ -16,9 +16,6 @@ class MLTSModel:
         train_set, val_set = series.split_after(0.8)
         transformer = Scaler()
 
-        print('Train Set:')
-        print(train_set)
-
         train_transformed = transformer.fit_transform(train_set)
         val_transformed = transformer.transform(val_set)
 
@@ -46,20 +43,9 @@ class MLTSModel:
         model_copy = deepcopy(self.model.model.state_dict())
         encrypted_tensors = {}
 
-        print('Enc')
-
         for k in model_copy.keys():
-            print('Key: ' + str(k))
             tensor: torch.Tensor = model_copy[k]
-            print('Tensor: ')
-            print(tensor)
-            print('Shape: ' + str(tensor.shape))
-            print('Size: ' + str(tensor.size()))
             encrypted_tensor = EncryptedTensor.encrypt(context, tensor)
-            print('Encrypted?')
             encrypted_tensors[k] = encrypted_tensor
-            print('Encrypted tensor of key ' + str(k))
-            print('Decrypt tensor -')
-            print(encrypted_tensor.decrypt())
         
         return EncryptedModel(encrypted_tensors)

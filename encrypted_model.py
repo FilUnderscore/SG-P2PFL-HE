@@ -15,13 +15,8 @@ class EncryptedModel:
 
         encoder.encode_int(len(encrypted_tensors))
 
-        encoded = 0
         for key in self.encrypted_tensors:
             encoder.encode_tensor(key, encrypted_tensors[key])
-            encoded = encoded + 1
-            print('Encoded ' + str(encoded) + ' tensors.')
-        
-        print('Encoding complete.')
 
         buffer.seek(0)
         return buffer

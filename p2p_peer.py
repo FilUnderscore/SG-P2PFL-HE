@@ -15,7 +15,6 @@ from io import BytesIO
 
 from encrypted_model import EncryptedModel
 from binary import BinaryDecoder, BinaryEncoder
-from threading import Condition
 from torch import div
 from copy import deepcopy
 
@@ -27,8 +26,6 @@ peer_inst = None
 # Aggregate model from another peer
 @app.route('/aggregate_model', methods=['POST'])
 def aggregate_model():
-    print('Hello aggregate!')
-
     buffer = BytesIO(request.data)
     decoder = BinaryDecoder(buffer)
 
@@ -37,8 +34,6 @@ def aggregate_model():
     model_owner = decoder.decode_int()
     aggregated_count = decoder.decode_int()
     encrypted_model = EncryptedModel.from_buffer(buffer, peer_inst.context)
-
-    print('Model owner: ' + str(model_owner) + ' - OUR ID: ' + str(peer_id) + ' - AGGREGATE COUNT ' + str(aggregated_count))
 
     if peer_id != model_owner:
         peer_inst.aggregate_received_model(encrypted_model, model_owner, aggregated_count)
@@ -63,7 +58,6 @@ class P2PPeer(FLPeer):
         self.context = ts.context(ts.SCHEME_TYPE.CKKS, poly_modulus_degree=8192, coeff_mod_bit_sizes=[60, 40, 40, 60])
         self.context.generate_galois_keys()
         self.context.global_scale = 2**40
-        self.aggregate_cond = Condition()
 
         global peer_inst
         peer_inst = self
@@ -144,29 +138,13 @@ class P2PPeer(FLPeer):
         self.send('http://' + next_peer['address'] + ':' + next_peer['ext_port'] + '/aggregate_model', encrypted_model.to_buffer(encrypted_model_buffer))
 
     def decode_received_model(self, encrypted_model: EncryptedModel, aggregated_count: int):
-        print('Acquiring.')
-        self.aggregate_cond.acquire()
-        print('Acquired.')
         state_dict = deepcopy(self.ml_model.model.model.state_dict())
 
         for k in encrypted_model.encrypted_tensors:
             encrypted_tensor = encrypted_model.encrypted_tensors[k]
-            print('received tensor')
-            print(encrypted_tensor.decrypt())
-            print('stored tensor')
-            print(state_dict[k])
             state_dict[k] = div(encrypted_tensor.decrypt(), aggregated_count + 1)
-            print('result tensor')
-            print(state_dict[k])
         
         self.ml_model.load_state_dict(state_dict)
-        
-        print('Loaded state dict.')
-
-        self.aggregate_cond.notify()
-        self.aggregate_cond.release()
-
-        print('Notified.')
 
     def aggregate(self):
         # send encrypted model to next peer and next peer will send to following peer etc.
@@ -183,15 +161,8 @@ class P2PPeer(FLPeer):
         encoder.encode_int(model_owner)
         encoder.encode_int(0)
 
-        print('Posting.')
+        print('Beginning model aggregation.')
 
         self.send('http://' + next_peer['address'] + ':' + next_peer['ext_port'] + '/aggregate_model', encrypted_model.to_buffer(encrypted_model_buffer))
-
-        print('Waiting for models to be aggregated...')
-
-        # wait for model to be received and decrypt.
-        #self.aggregate_cond.acquire()
-        #self.aggregate_cond.wait()
-        #self.aggregate_cond.release()
 
         print('Aggregated models.')
