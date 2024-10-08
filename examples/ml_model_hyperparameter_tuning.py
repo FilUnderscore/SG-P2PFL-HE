@@ -1,12 +1,10 @@
-from fl_peer import FLPeer
-from MLTSModel import MLTSModel
-from data_provider import CSVTSDataProvider
+from p2pfl.fl_peer import FLPeer
+from examples.fl_sample_model import SampleTSForecastingModel
+from p2pfl.data_provider import CSVTSDataProvider
 
 import datetime
 
-import matplotlib.pyplot as plt
-
-from fl_sample_model import loss_recorder, train_model, recreate_early_stopper
+from examples.fl_sample_model import loss_recorder, train_model, recreate_early_stopper
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
@@ -23,14 +21,14 @@ def apply_datetime_transformations(df):
     return df
 
 def train_model1(model_args, callbacks, csv_ts_data_provider):
-    ml_model = MLTSModel(train_model(model_args, callbacks))
+    ml_model = SampleTSForecastingModel(train_model(model_args, callbacks))
     peer = FLPeer(ml_model, csv_ts_data_provider)
     peer.train()
     loss_recorder.train_loss_history.clear()
     loss_recorder.val_loss_history.clear()
     recreate_early_stopper()
 
-csv_ts_data_provider = CSVTSDataProvider('C:\\Users\\Filip\\Desktop\\P2PFL\\testdata2.csv', lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
+csv_ts_data_provider = CSVTSDataProvider('dataset/testdata2.csv', lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
 
 tune_callback = TuneReportCheckpointCallback(
     {

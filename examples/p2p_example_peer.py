@@ -1,6 +1,5 @@
-from p2p_peer import P2PPeer
-from MLTSModel import MLTSModel
-from data_provider import CSVTSDataProvider
+from p2pfl.p2p_peer import P2PPeer
+from p2pfl.data_provider import CSVTSDataProvider
 
 from datetime import datetime
 
@@ -9,7 +8,7 @@ import random
 
 import sys
 
-from fl_sample_model import create_new_model
+from examples.fl_sample_model import create_new_model
 from darts.dataprocessing.transformers.scaler import Scaler
 
 def strToDateTime(str):
@@ -25,7 +24,7 @@ LOCAL_PORT = random.randint(1000, 2000)
 
 DATASET_CSV_FILE = sys.argv[1]
 
-ml_model = MLTSModel(create_new_model())
+ml_model = create_new_model()
 csv_ts_data_provider = CSVTSDataProvider(DATASET_CSV_FILE, lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
 
 print('Starting Peer')

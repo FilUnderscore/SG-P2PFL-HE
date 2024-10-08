@@ -1,9 +1,9 @@
-from fl_peer import FLPeer
-from MLTSModel import MLTSModel
-from data_provider import CSVTSDataProvider
+from p2pfl.fl_peer import FLPeer
+from p2pfl.model import Model
+from p2pfl.data_provider import CSVTSDataProvider
 
 from threading import Thread
-from flask import Flask, send_file, request
+from flask import Flask, request
 
 from requests import post, get
 from shutil import copyfileobj
@@ -13,8 +13,8 @@ from time import sleep
 import tenseal as ts
 from io import BytesIO
 
-from encrypted_model import EncryptedModel
-from binary import BinaryDecoder, BinaryEncoder
+from p2pfl.encryption import EncryptedModel
+from p2pfl.binary import BinaryDecoder, BinaryEncoder
 from torch import div
 from copy import deepcopy
 
@@ -51,7 +51,7 @@ def model_ready():
         return 'no', 200
 
 class P2PPeer(FLPeer):
-    def __init__(self, REGISTRATION_ADDRESS, LOCAL_PORT, ml_model: MLTSModel, data_provider: CSVTSDataProvider):
+    def __init__(self, REGISTRATION_ADDRESS, LOCAL_PORT, ml_model: Model, data_provider: CSVTSDataProvider):
         FLPeer.__init__(self, ml_model, data_provider)
         self.LOCAL_PORT = LOCAL_PORT
         self.REGISTRATION_ADDRESS = REGISTRATION_ADDRESS
@@ -94,7 +94,6 @@ class P2PPeer(FLPeer):
 
     def train(self):
         FLPeer.train(self)
-        self.ml_model.save(f'temp/{peer_id}_model.pth')
 
         global trained
         trained = True
@@ -121,7 +120,7 @@ class P2PPeer(FLPeer):
         return (peer_id + 1) % peer_count
 
     def aggregate_received_model(self, encrypted_model: EncryptedModel, model_owner: int, aggregated_count: int):
-        state_dict = self.ml_model.model.model.state_dict()
+        state_dict = self.ml_model.get_state_dict()
 
         for k in encrypted_model.encrypted_tensors:
             encrypted_model.encrypted_tensors[k].add(state_dict[k])
@@ -138,7 +137,7 @@ class P2PPeer(FLPeer):
         self.send('http://' + next_peer['address'] + ':' + next_peer['ext_port'] + '/aggregate_model', encrypted_model.to_buffer(encrypted_model_buffer))
 
     def decode_received_model(self, encrypted_model: EncryptedModel, aggregated_count: int):
-        state_dict = deepcopy(self.ml_model.model.model.state_dict())
+        state_dict = deepcopy(self.ml_model.get_state_dict())
 
         for k in encrypted_model.encrypted_tensors:
             encrypted_tensor = encrypted_model.encrypted_tensors[k]

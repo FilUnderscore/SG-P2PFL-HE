@@ -1,16 +1,14 @@
 from argparse import ArgumentParser
 
 from fl_sample_model import create_new_model, loss_recorder, recreate_early_stopper
-from MLTSModel import MLTSModel
 
-from data_provider import CSVTSDataProvider
+from p2pfl.data_provider import CSVTSDataProvider
 from datetime import datetime
 
-from fl_peer import FLPeer
+from p2pfl.fl_peer import FLPeer
 import matplotlib.pyplot as plt
 
 from darts.dataprocessing.transformers.scaler import Scaler
-from darts.models.forecasting.torch_forecasting_model import TorchForecastingModel
 
 def strToDateTime(str):
     return datetime.strptime(str, '%d/%m/%Y %H:%M')
@@ -20,7 +18,7 @@ def apply_datetime_transformations(df):
     return df
 
 def train_model(data_csv_file):
-    ml_model = MLTSModel(create_new_model())
+    ml_model = create_new_model()
     csv_ts_data_provider = CSVTSDataProvider(data_csv_file, lambda df: apply_datetime_transformations(df), time_col='tstp', value_cols=['energy(kWh/hh)'])
 
     print('Training model with data ', data_csv_file)

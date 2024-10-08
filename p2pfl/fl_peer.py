@@ -1,10 +1,13 @@
-from MLTSModel import MLTSModel
-from data_provider import DataProvider
+from p2pfl.model import Model
+from p2pfl.data_provider import DataProvider
 import torch
 from copy import deepcopy
 
 class FLPeer:
-    def __init__(self, ml_model: MLTSModel, data_provider: DataProvider):
+    ml_model: Model = None
+    data_provider: DataProvider = None
+
+    def __init__(self, ml_model: Model, data_provider: DataProvider):
         self.ml_model = ml_model
         self.data_provider = data_provider
 
