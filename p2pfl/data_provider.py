@@ -56,4 +56,5 @@ class CSVTSDataProvider(CSVDataProvider, TSDataProvider):
         self.series = TSDataProvider.get_data(self)
 
     def get_data(self) -> TimeSeries:
+        """Returns TS data in the form of a Darts TimeSeries."""
         return self.series
