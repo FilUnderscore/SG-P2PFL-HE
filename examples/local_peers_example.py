@@ -45,6 +45,8 @@ def init(args):
         prediction_inverse_transformed = transformer.inverse_transform(prediction)
         series.plot(label='actual')
         prediction_inverse_transformed.plot(label='local forecast')
+        plt.xlabel('Date (hh)')
+        plt.ylabel('Energy Consumption (kWh/hh)')
 
         # Plot training metrics
         plt.figure(len(data_csv_files))
@@ -73,7 +75,7 @@ def init(args):
 
     for i in range(0, len(peers)):
         peer: FLPeer = peers[i]
-        peer.ml_model.save(f'model_{i}.pth')
+        peer.ml_model.save_to_file(f'model_{i}.pth')
         models.append(f'model_{i}.pth')
     
     print('Saved models.')
@@ -99,14 +101,6 @@ def init(args):
         plt.ylabel('Energy Consumption (kWh/hh)')
         plt.legend()
         plt.title(f'PEER {i} predictions')
-
-    global_train_loss = []
-
-    for i in range(0, len(peer_train_loss)):
-        value = peer_train_loss[i]
-        print(value)
-
-    plt.figure(len(peers))
 
     plt.show()
 

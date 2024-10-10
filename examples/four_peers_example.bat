@@ -1,1 +1,1 @@
-python local_peers_example.py testdata.csv testdata1.csv testdata2.csv testdata3.csv
+python local_peers_example.py dataset/testdata.csv dataset/testdata1.csv dataset/testdata2.csv dataset/testdata3.csv
