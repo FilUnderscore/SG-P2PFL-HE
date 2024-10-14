@@ -50,8 +50,8 @@ def recreate_early_stopper():
 def generate_torch_kwargs():
     return {
         "pl_trainer_kwargs": {
-            "accelerator": "gpu",
-            "devices": [0],
+            "accelerator": "gpu", # change to "cpu" for CPU training
+            "devices": [0], # remove this line for CPU training
             "callbacks": [TFMProgressBar(enable_train_bar_only=False), loss_recorder, early_stopper]
         }
     }

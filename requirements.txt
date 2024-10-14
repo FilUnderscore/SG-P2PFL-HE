@@ -27,12 +27,15 @@ idna==3.8
 itsdangerous==2.2.0
 Jinja2==3.1.4
 joblib==1.4.2
+jsonschema==4.23.0
+jsonschema-specifications==2024.10.1
 kiwisolver==1.4.7
 lightning-utilities==0.11.7
 llvmlite==0.43.0
 MarkupSafe==2.1.5
 matplotlib==3.9.2
 mpmath==1.3.0
+msgpack==1.1.0
 multidict==6.0.5
 networkx==3.3
 nfoursid==1.0.1
@@ -51,7 +54,10 @@ python-dateutil==2.9.0.post0
 pytorch-lightning==2.4.0
 pytz==2024.1
 PyYAML==6.0.2
+ray==2.37.0
+referencing==0.35.1
 requests==2.32.3
+rpds-py==0.20.0
 scikit-learn==1.5.1
 scipy==1.14.1
 setuptools==74.1.2
@@ -62,6 +68,7 @@ statsforecast==1.7.6
 statsmodels==0.14.2
 sympy==1.13.2
 tbats==1.1.3
+tenseal==0.3.15
 tensorboardX==2.6.2.2
 threadpoolctl==3.5.0
 torch==2.4.1
