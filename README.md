@@ -1,5 +1,5 @@
-# P2PFL
-A novel Federated Learning framework for Python that leverages Peer-to-Peer networking via HTTP for privacy-preservation with Homomorphic Encryption.
+# SG IoT P2PFL HE
+A novel Smart Grid (SG) Internet of Things (IoT) Federated Learning (FL) framework for Python that leverages Peer-to-Peer networking via HTTP for privacy-preservation with Homomorphic Encryption (HE).
 
 ## Getting Started
 Run the `setup_dev.bat` script or run the following command:
@@ -18,6 +18,3 @@ There are two examples included with the framework:
 * `p2p_example_peer.py` and `p2p_registration.py` involve setting up a peer-to-peer network with a central registration node utilizing Homomorphic Encryption (built into the p2p implementation) running on a variable number of machines in a network.
 
 Both examples come with a number of scripts to run to demonstrate the framework in action.
-
-## Credits
-* Filip Jerkovic - author of P2PFL
